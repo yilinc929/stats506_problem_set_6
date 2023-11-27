@@ -1,0 +1,75 @@
+---
+title: "STATS 506 PS 6"
+author: "Yilin Chen 30221403"
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+## Problem 1
+
+### 1.With Parallel Processing
+
+```{r}
+library(nycflights13)
+library(dplyr)
+library(parallel)
+
+bootstrap_statistic <- function(sample) {
+  mean(sample$dep_delay, na.rm = TRUE)
+}
+strata <- split(data, data$dest)
+bootstrap_stratum <- function(stratum) {
+  replicate(1000, bootstrap_statistic(stratum[sample(nrow(stratum), nrow(stratum), 
+                                                     replace = TRUE), ]))
+}
+num_cores <- detectCores() - 1
+cl <- makeCluster(num_cores)
+
+clusterExport(cl, varlist = c("bootstrap_statistic", "bootstrap_stratum"))
+clusterEvalQ(cl, library(stats))
+
+results <- parLapply(cl, strata, bootstrap_stratum)
+
+stopCluster(cl)
+
+final_results <- lapply(names(results), function(dest) {
+  bootstrapped_values <- do.call(c, results[dest])
+  ci <- quantile(bootstrapped_values, probs = c(0.025, 0.975))
+  data.frame(
+    dest = dest,
+    mean_estimate = mean(bootstrapped_values),
+    ci_lower = ci[1],
+    ci_upper = ci[2]
+  )
+})
+
+final_results <- do.call(rbind, final_results)
+```
+
+```{r}
+print(final_results)
+```
+
+### 2.Without Any Parallel Processing
+
+```{r}
+library(future)
+library(purrr) 
+results <- lapply(strata, bootstrap_stratum)
+
+final_results2 <- map2_dfr(names(results), results, ~{
+  bootstrapped_values <- unlist(.y)
+  ci <- quantile(bootstrapped_values, probs = c(0.025, 0.975))
+  tibble(
+    dest = .x,
+    mean_estimate = mean(bootstrapped_values),
+    ci_lower = ci[1],
+    ci_upper = ci[2]
+  )
+})
+
+print(final_results2)
+
+```
