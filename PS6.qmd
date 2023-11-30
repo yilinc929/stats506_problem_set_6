@@ -9,31 +9,48 @@ editor: visual
 
 ## Problem 1
 
-### 1.With Parallel Processing
+### **With Parallel Processing**
+
+### Using `Parallel` Package
 
 ```{r}
 library(nycflights13)
 library(dplyr)
 library(parallel)
 
+# Define a function for bootstrapping
 bootstrap_statistic <- function(sample) {
   mean(sample$dep_delay, na.rm = TRUE)
 }
+
+# Prepare the data
+data <- flights %>% 
+  select(origin, dest, dep_delay) %>% 
+  filter(!is.na(dep_delay))  # Filter out missing values
+
+# Create strata based on 'dest'
 strata <- split(data, data$dest)
+
+# Function for bootstrapping a stratum
 bootstrap_stratum <- function(stratum) {
-  replicate(1000, bootstrap_statistic(stratum[sample(nrow(stratum), nrow(stratum), 
-                                                     replace = TRUE), ]))
+  replicate(1000, bootstrap_statistic(stratum[sample(nrow(stratum), nrow(stratum), replace = TRUE), ]))
 }
+
+# Setting up parallel processing
 num_cores <- detectCores() - 1
 cl <- makeCluster(num_cores)
 
+# Export necessary functions and libraries to the child processes
 clusterExport(cl, varlist = c("bootstrap_statistic", "bootstrap_stratum"))
 clusterEvalQ(cl, library(stats))
 
+# Apply the bootstrap function to each stratum
 results <- parLapply(cl, strata, bootstrap_stratum)
 
+# Close the parallel cluster
 stopCluster(cl)
 
+# Post-process to calculate estimates and confidence intervals
 final_results <- lapply(names(results), function(dest) {
   bootstrapped_values <- do.call(c, results[dest])
   ci <- quantile(bootstrapped_values, probs = c(0.025, 0.975))
@@ -46,20 +63,45 @@ final_results <- lapply(names(results), function(dest) {
 })
 
 final_results <- do.call(rbind, final_results)
+
 ```
 
 ```{r}
 print(final_results)
 ```
 
-### 2.Without Any Parallel Processing
+### Without Any Parallel Processing
+
+### Serial Computing
 
 ```{r}
-library(future)
-library(purrr) 
+# Load necessary libraries
+library(nycflights13)
+library(dplyr)
+
+# Define the bootstrap statistic function
+bootstrap_statistic <- function(sample) {
+  mean(sample$dep_delay, na.rm = TRUE)
+}
+
+# Prepare the data
+data <- flights %>%
+  select(origin, dest, dep_delay) %>%
+  filter(!is.na(dep_delay)) # Filter out missing values
+
+# Create strata based on 'dest'
+strata <- split(data, data$dest)
+
+# Function for bootstrapping a stratum
+bootstrap_stratum <- function(stratum) {
+  replicate(1000, bootstrap_statistic(stratum[sample(nrow(stratum), nrow(stratum), replace = TRUE), ]))
+}
+
+# Apply the bootstrap function to each stratum
 results <- lapply(strata, bootstrap_stratum)
 
-final_results2 <- map2_dfr(names(results), results, ~{
+# Post-process to calculate estimates and confidence intervals
+final_results <- map2_dfr(names(results), results, ~{
   bootstrapped_values <- unlist(.y)
   ci <- quantile(bootstrapped_values, probs = c(0.025, 0.975))
   tibble(
@@ -69,7 +111,10 @@ final_results2 <- map2_dfr(names(results), results, ~{
     ci_upper = ci[2]
   )
 })
-
-print(final_results2)
-
 ```
+
+```{r}
+print(final_results)
+```
+
+My Github Repository: <https://github.com/yilinc929/stats506_problem_set_6>
