@@ -70,7 +70,7 @@ final_results <- do.call(rbind, final_results)
 print(final_results)
 ```
 
-### Without Any Parallel Processing
+### **Without Any Parallel Processing**
 
 ### Serial Computing
 
@@ -78,6 +78,7 @@ print(final_results)
 # Load necessary libraries
 library(nycflights13)
 library(dplyr)
+library(purrr)
 
 # Define the bootstrap statistic function
 bootstrap_statistic <- function(sample) {
