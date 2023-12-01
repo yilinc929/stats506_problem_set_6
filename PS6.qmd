@@ -50,7 +50,7 @@ results <- parLapply(cl, strata, bootstrap_stratum)
 # Close the parallel cluster
 stopCluster(cl)
 
-# Post-process to calculate estimates and confidence intervals
+# calculate estimates and confidence intervals
 final_results <- lapply(names(results), function(dest) {
   bootstrapped_values <- do.call(c, results[dest])
   ci <- quantile(bootstrapped_values, probs = c(0.025, 0.975))
@@ -70,15 +70,15 @@ final_results <- do.call(rbind, final_results)
 print(final_results)
 ```
 
-### **Without Any Parallel Processing**
+### Using `Future` Package
 
-### Serial Computing
+print(final_results)
 
 ```{r}
-# Load necessary libraries
 library(nycflights13)
 library(dplyr)
-library(purrr)
+library(future)
+library(purrr) 
 
 # Define the bootstrap statistic function
 bootstrap_statistic <- function(sample) {
@@ -101,7 +101,7 @@ bootstrap_stratum <- function(stratum) {
 # Apply the bootstrap function to each stratum
 results <- lapply(strata, bootstrap_stratum)
 
-# Post-process to calculate estimates and confidence intervals
+# calculate estimates and confidence intervals
 final_results <- map2_dfr(names(results), results, ~{
   bootstrapped_values <- unlist(.y)
   ci <- quantile(bootstrapped_values, probs = c(0.025, 0.975))
@@ -112,10 +112,52 @@ final_results <- map2_dfr(names(results), results, ~{
     ci_upper = ci[2]
   )
 })
+
 ```
 
 ```{r}
 print(final_results)
+```
+
+### **Without Any Parallel Processing**
+
+### Serial Computing
+
+```{r}
+library(nycflights13)
+library(dplyr)
+data(flights)
+
+# Define the bootstrap function
+bootstrap_fn <- function(data) {
+  # Stratified sampling
+  boot_samples <- data %>%
+    group_by(dest) %>%
+    sample_n(size = n(), replace = TRUE) %>%
+    ungroup()
+  
+  # Calculate average air_time per origin
+  boot_samples %>%
+    group_by(origin) %>%
+    summarize(avg_air_time = mean(air_time, na.rm = TRUE))
+}
+
+# Perform bootstrap
+set.seed(123)
+results <- replicate(1000, bootstrap_fn(flights), simplify = FALSE)
+
+# Calculate confidence intervals and compile results
+results_df <- bind_rows(results) %>%
+  group_by(origin) %>%
+  summarize(
+    Estimate = mean(avg_air_time),
+    Lower_CI = quantile(avg_air_time, probs = 0.025),
+    Upper_CI = quantile(avg_air_time, probs = 0.975)
+  )
+```
+
+```{r}
+print(results_df)
 ```
 
 My Github Repository: <https://github.com/yilinc929/stats506_problem_set_6>
