@@ -67,7 +67,7 @@ final_results <- do.call(rbind, final_results)
 ```
 
 ```{r}
-print(final_results)
+print(head(final_results),10)
 ```
 
 ### Using `Future` Package
@@ -161,3 +161,5 @@ print(results_df)
 ```
 
 My Github Repository: <https://github.com/yilinc929/stats506_problem_set_6>
+
+Sources That I Used:
